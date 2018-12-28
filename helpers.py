@@ -35,3 +35,29 @@ def predictions():
     with open(test_results_fn, "r") as f:
         for row in csv.reader(f, delimiter='\t'):
             yield STANCES[argmax(row)]
+
+def print_metrics():
+    num_gold = {c: 0 for c in STANCES}
+    num_guess = {c: 0 for c in STANCES}
+    num_tp = {c: 0 for c in STANCES}
+
+    data, columns = read('SemEval2016-Task6-subtaskA-testdata-gold.txt', delimiter='\t')
+    for l, pred in zip(data, predictions()):
+        label = l[-1]
+        num_gold[label] += 1
+        num_guess[pred] += 1
+        if label == pred:
+            num_tp[pred] += 1
+
+    p = {}
+    r = {}
+    f = {}
+
+    for c in STANCES:
+        p[c] = num_tp[c] / num_guess[c] if num_guess[c] != 0 else 0
+        r[c] = num_tp[c] / num_gold[c] if num_gold[c] != 0 else 0
+        f[c] = (2 * p[c] * r[c] / (p[c] + r[c])) if p[c] + r[c] != 0 else 0
+
+        print("%s precision = %.4f  recall = %.4f  F = %.4f" % (c, p[c], r[c], f[c]))
+
+    print("macro F = %.4f" % (f["FAVOR"] + f["AGAINST"] / 2))
