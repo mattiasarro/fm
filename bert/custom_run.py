@@ -25,6 +25,7 @@ import modeling
 import optimization
 import tokenization
 import tensorflow as tf
+import helpers as h
 
 flags = tf.flags
 
@@ -571,14 +572,36 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
 
             def metric_fn(per_example_loss, label_ids, logits, is_real_example):
                 predictions = tf.argmax(logits, axis=-1, output_type=tf.int32)
-                accuracy = tf.metrics.accuracy(
-                    labels=label_ids, predictions=predictions, weights=is_real_example)
-                loss = tf.metrics.mean(
-                    values=per_example_loss, weights=is_real_example)
-                return {
-                    "eval_accuracy": accuracy,
-                    "eval_loss": loss,
+                lab = tf.one_hot(label_ids, len(h.STANCES), axis=-1)
+                pred = tf.one_hot(predictions, len(h.STANCES), axis=-1)
+                f1 = lambda c: 2 * p[c][0] * r[c][0] / (p[c][0] + r[c][0])
+
+                p = {
+                    c: tf.metrics.precision(lab[:, i], pred[:, i])
+                    for i, c in enumerate(h.STANCES)
                 }
+                r = {
+                    c: tf.metrics.recall(lab[:, i], pred[:, i])
+                    for i, c in enumerate(h.STANCES)
+                }
+                f = {
+                    c: (f1(c), tf.no_op())
+                    for i, c in enumerate(h.STANCES)
+                }
+
+                ret = {}
+                for c in h.STANCES:
+                    ret[c + "_precision"] = p[c]
+                    ret[c + "_recall"] = r[c]
+                    ret[c + "_F1"] = f[c]
+
+                ret["macro_avg"] = ((f["FAVOR"][0] + f["AGAINST"][0]) / 2, tf.no_op())
+                ret["eval_accuracy"] = tf.metrics.accuracy(
+                    labels=label_ids, predictions=predictions, weights=is_real_example)
+                ret["eval_loss"] = tf.metrics.mean(
+                    values=per_example_loss, weights=is_real_example)
+
+                return ret
 
             eval_metrics = (metric_fn,
                             [per_example_loss, label_ids, logits, is_real_example])
@@ -751,6 +774,10 @@ def main(_):
     if FLAGS.task == "tep":
         train(estimator, train_input_fn, num_train_steps, train_examples)
         evaluate(estimator, eval_input_fn)
+        predict(processor, tokenizer, estimator)
+    elif FLAGS.task == "eval":
+        evaluate(estimator, eval_input_fn)
+    elif FLAGS.task == "predict":
         predict(processor, tokenizer, estimator)
     else:
         raise Exception("Unknown task " + str(FLAGS.task))

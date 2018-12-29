@@ -1,9 +1,9 @@
 import pandas as pd
 import csv
 
-dataset_path = '../data/stance_detection/'
-test_results_fn = "../predictions/test_results.tsv"
-test_results_processed_fn = "../predictions/test_results_processed.tsv"
+dataset_path = 'data/stance_detection/'
+test_results_fn = "predictions/test_results.tsv"
+test_results_processed_fn = "predictions/test_results_processed.tsv"
 STANCES = ["AGAINST", "NONE", "FAVOR"]
 TARGETS = [
     "Hillary Clinton",
