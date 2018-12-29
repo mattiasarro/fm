@@ -572,10 +572,13 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
         elif mode == tf.estimator.ModeKeys.EVAL:
 
             def metric_fn(per_example_loss, label_ids, logits, is_real_example):
+                def f1(c):
+                    ret = 2 * p[c][0] * r[c][0] / (p[c][0] + r[c][0])
+                    return tf.select(tf.is_nan(ret), tf.zeros_like(ret), ret)
+
                 predictions = tf.argmax(logits, axis=-1, output_type=tf.int32)
                 lab = tf.one_hot(label_ids, len(h.STANCES), axis=-1)
                 pred = tf.one_hot(predictions, len(h.STANCES), axis=-1)
-                f1 = lambda c: 2 * p[c][0] * r[c][0] / (p[c][0] + r[c][0])
 
                 p = {
                     c: tf.metrics.precision(lab[:, i], pred[:, i])
