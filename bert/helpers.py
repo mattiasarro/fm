@@ -1,10 +1,17 @@
 import pandas as pd
 import csv
 
-dataset_path = 'data/stance_detection/'
-test_results_fn = "predictions/test_results.tsv"
-test_results_processed_fn = "predictions/test_results_processed.tsv"
+dataset_path = '../data/stance_detection/'
+test_results_fn = "../predictions/test_results.tsv"
+test_results_processed_fn = "../predictions/test_results_processed.tsv"
 STANCES = ["AGAINST", "NONE", "FAVOR"]
+TARGETS = [
+    "Hillary Clinton",
+    "Feminist Movement",
+    "Legalization of Abortion",
+    "Atheism",
+    "Climate Change is a Real Concern",
+]
 
 def train_data():
     data, columns = read('SemEval2016-Task6-subtaskA-traindata-gold.csv', quotechar='"')
@@ -36,18 +43,21 @@ def predictions():
         for row in csv.reader(f, delimiter='\t'):
             yield STANCES[argmax(row)]
 
-def print_metrics():
+def print_metrics(target=None):
     num_gold = {c: 0 for c in STANCES}
     num_guess = {c: 0 for c in STANCES}
     num_tp = {c: 0 for c in STANCES}
 
     data, columns = read('SemEval2016-Task6-subtaskA-testdata-gold.txt', delimiter='\t')
     for l, pred in zip(data, predictions()):
+        if target and l[1] != target: continue
         label = l[-1]
         num_gold[label] += 1
         num_guess[pred] += 1
         if label == pred:
             num_tp[pred] += 1
+
+    if target: print(target)
 
     p, r, f = {}, {}, {}
     for c in STANCES:
@@ -59,3 +69,8 @@ def print_metrics():
               (c, p[c], r[c], f[c], num_guess[c], num_gold[c]))
 
     print("macro F = %.4f" % (f["FAVOR"] + f["AGAINST"] / 2))
+
+def print_metrics_per_target():
+    for target in TARGETS + [None]:
+        print_metrics(target)
+        print("")

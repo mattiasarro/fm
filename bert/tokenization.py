@@ -23,7 +23,7 @@ import re
 import unicodedata
 import six
 import tensorflow as tf
-
+from nltk.tokenize import TweetTokenizer
 
 def validate_case_matches_checkpoint(do_lower_case, init_checkpoint):
     """Checks whether the casing config is consistent with the checkpoint name."""
@@ -150,6 +150,9 @@ def convert_ids_to_tokens(inv_vocab, ids):
 
 
 def whitespace_tokenize(text):
+    return TweetTokenizer(strip_handles=True, reduce_len=True).tokenize(text)
+
+def whitespace_tokenize_old(text):
     """Runs basic whitespace cleaning and splitting on a piece of text."""
     text = text.strip()
     if not text:

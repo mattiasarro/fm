@@ -20,7 +20,7 @@ te[(te.Target == "Feminist Movement") & (te.Sentiment == "other")].Stance.value_
 
 tr.Target.value_counts()
 
-tr.Sentiment.value_counts()
+tr.Stance.value_counts()
 
 tr[(tr.Target == "Hillary Clinton") & (tr["Opinion Towards"] == no_op)].head(30)
 
