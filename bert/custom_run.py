@@ -51,7 +51,7 @@ flags.DEFINE_string("vocab_file", None,
                     "The vocabulary file that the BERT model was trained on.")
 
 flags.DEFINE_string(
-    "output_dir", None,
+    "output_dir", "/tmp",
     "The output directory where the model checkpoints will be written.")
 
 # Other parameters
@@ -620,7 +620,10 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
 
     return model_fn
 
-def get_estimator(processor):
+def get_estimator(
+    processor, learning_rate=FLAGS.learning_rate,
+    train_batch_size=FLAGS.train_batch_size, model_dir=FLAGS.output_dir,
+):
     bert_config = modeling.BertConfig.from_json_file(FLAGS.bert_config_file)
 
     if FLAGS.max_seq_length > bert_config.max_position_embeddings:
@@ -639,7 +642,7 @@ def get_estimator(processor):
     run_config = tf.contrib.tpu.RunConfig(
         cluster=None,
         master=FLAGS.master,
-        model_dir=FLAGS.output_dir,
+        model_dir=model_dir,
         save_checkpoints_steps=ceil(len(train_examples) / FLAGS.train_batch_size),
         tpu_config=tf.contrib.tpu.TPUConfig(
             iterations_per_loop=FLAGS.iterations_per_loop,
@@ -650,7 +653,7 @@ def get_estimator(processor):
         bert_config=bert_config,
         num_labels=len(processor.get_labels()),
         init_checkpoint=FLAGS.init_checkpoint,
-        learning_rate=FLAGS.learning_rate,
+        learning_rate=learning_rate,
         num_train_steps=num_train_steps,
         num_warmup_steps=num_warmup_steps,
         use_tpu=FLAGS.use_tpu,
@@ -660,7 +663,7 @@ def get_estimator(processor):
         use_tpu=FLAGS.use_tpu,
         model_fn=model_fn,
         config=run_config,
-        train_batch_size=FLAGS.train_batch_size,
+        train_batch_size=train_batch_size,
         eval_batch_size=FLAGS.eval_batch_size,
         predict_batch_size=FLAGS.predict_batch_size)
 
@@ -777,6 +780,17 @@ def train_and_eval(estimator, train_input_fn, eval_input_fn, num_train_steps, tr
         ),
     )
 
+def tune(processor, train_input_fn, eval_input_fn):
+    for lr in [5e-5, 3e-5, 2e-5]:
+        for bs in [16, 32]:
+            estimator, train_examples, num_train_steps = get_estimator(
+                processor,
+                learning_rate=lr,
+                train_batch_size=bs,
+                model_dir="/tmp/tune/lr_%s_bs_%i" % (str(lr), bs),
+            )
+            train_and_eval(estimator, train_input_fn, eval_input_fn, num_train_steps, train_examples)
+
 def main(_):
     tf.logging.set_verbosity(tf.logging.INFO)
     tf.gfile.MakeDirs(FLAGS.output_dir)
@@ -791,12 +805,14 @@ def main(_):
         train(estimator, train_input_fn, num_train_steps, train_examples)
         evaluate(estimator, eval_input_fn)
         predict(processor, tokenizer, estimator)
-    elif FLAGS.task == "te":
-        train_and_eval(estimator, train_input_fn, eval_input_fn, num_train_steps, train_examples)
     elif FLAGS.task == "eval":
         evaluate(estimator, eval_input_fn)
     elif FLAGS.task == "predict":
         predict(processor, tokenizer, estimator)
+    elif FLAGS.task == "te":
+        train_and_eval(train_input_fn, eval_input_fn, num_train_steps, train_examples)
+    if FLAGS.task == "tune":
+        tune(processor, train_input_fn, eval_input_fn)
     else:
         raise Exception("Unknown task " + str(FLAGS.task))
 
