@@ -16,6 +16,10 @@ second phrase is our target
 
 The obvious problem with Twitter data is the usage of special / abbreviated vocabulary, hashtags, username handles, and incorrect spelling in general. This will cause a lot of out of vocabulary (OOV) words when using pretrained models, and will not generalise to a new domain, since it would not contain the same set of hashtags or users. It would be a good idea to replace abbreviations, slang and misspellings in tweets with a more standard vocabulary that is used across other domains (news, books, Wikipedia). This would lead to a bigger overlap between the vocabularies of the source domain (Tweets), target domain (news articles), and pretraining domain (Wikipedia). The contents of hastags (e.g. character-by-character) could also be useful for predicting stance, however it is not clear how might be transferred to a new domain. Using the raw text could be valid in some cases but misleading in others (e.g. a tweet critical of Hilary Clinton could still be tagged with #HilaryForPresident).
 
+## Experiments
+
+* Removing the hashtag degrades performance, but might be worth doing when the only purpose is to do domain adaptation
+
 ## Transfer Learning Procedure
 
 Alternate between:

@@ -26,6 +26,7 @@ import optimization
 import tokenization
 import tensorflow as tf
 import helpers as h
+from math import ceil
 
 flags = tf.flags
 
@@ -576,23 +577,6 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                 pred = tf.one_hot(predictions, len(h.STANCES), axis=-1)
                 f1 = lambda c: 2 * p[c][0] * r[c][0] / (p[c][0] + r[c][0])
 
-                # tp = {
-                #     c: tf.metrics.true_positives(lab[:, i], pred[:, i])
-                #     for i, c in enumerate(h.STANCES)
-                # }
-                # tn = {
-                #     c: tf.metrics.true_negatives(lab[:, i], pred[:, i])
-                #     for i, c in enumerate(h.STANCES)
-                # }
-                # fp = {
-                #     c: tf.metrics.false_positives(lab[:, i], pred[:, i])
-                #     for i, c in enumerate(h.STANCES)
-                # }
-                # fn = {
-                #     c: tf.metrics.false_negatives(lab[:, i], pred[:, i])
-                #     for i, c in enumerate(h.STANCES)
-                # }
-
                 p = {
                     c: tf.metrics.precision(lab[:, i], pred[:, i])
                     for i, c in enumerate(h.STANCES)
@@ -611,10 +595,6 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                     ret[c + "_precision"] = p[c]
                     ret[c + "_recall"] = r[c]
                     ret[c + "_F1"] = f[c]
-                    # ret[c + "__tp"] = tp[c]
-                    # ret[c + "__tn"] = tn[c]
-                    # ret[c + "__fp"] = fp[c]
-                    # ret[c + "__fn"] = fn[c]
 
                 ret["macro_avg"] = ((f["FAVOR"][0] + f["AGAINST"][0]) / 2, tf.no_op())
                 ret["eval_accuracy"] = tf.metrics.accuracy(
@@ -649,22 +629,22 @@ def get_estimator(processor):
             "was only trained up to sequence length %d" %
             (FLAGS.max_seq_length, bert_config.max_position_embeddings))
 
-    run_config = tf.contrib.tpu.RunConfig(
-        cluster=None,
-        master=FLAGS.master,
-        model_dir=FLAGS.output_dir,
-        save_checkpoints_steps=FLAGS.save_checkpoints_steps,
-        tpu_config=tf.contrib.tpu.TPUConfig(
-            iterations_per_loop=FLAGS.iterations_per_loop,
-            num_shards=FLAGS.num_tpu_cores,
-            per_host_input_for_training=tf.contrib.tpu.InputPipelineConfig.PER_HOST_V2))
-
     train_examples = None
     num_train_steps = None
     num_warmup_steps = None
     train_examples = processor.get_train_examples(FLAGS.data_dir)
     num_train_steps = int(len(train_examples) / FLAGS.train_batch_size * FLAGS.num_train_epochs)
     num_warmup_steps = int(num_train_steps * FLAGS.warmup_proportion)
+
+    run_config = tf.contrib.tpu.RunConfig(
+        cluster=None,
+        master=FLAGS.master,
+        model_dir=FLAGS.output_dir,
+        save_checkpoints_steps=ceil(len(train_examples) / FLAGS.train_batch_size),
+        tpu_config=tf.contrib.tpu.TPUConfig(
+            iterations_per_loop=FLAGS.iterations_per_loop,
+            num_shards=FLAGS.num_tpu_cores,
+            per_host_input_for_training=tf.contrib.tpu.InputPipelineConfig.PER_HOST_V2))
 
     model_fn = model_fn_builder(
         bert_config=bert_config,
@@ -719,11 +699,14 @@ def get_eval_input_fn(processor, tokenizer):
         is_training=False,
         drop_remainder=eval_drop_remainder)
 
-def train(estimator, train_input_fn, num_train_steps, train_examples):
+def train_log(train_examples, num_train_steps):
     tf.logging.info("***** Running training *****")
     tf.logging.info("  Num examples = %d", len(train_examples))
     tf.logging.info("  Batch size = %d", FLAGS.train_batch_size)
     tf.logging.info("  Num steps = %d", num_train_steps)
+
+def train(estimator, train_input_fn, num_train_steps, train_examples):
+    train_log(train_examples, num_train_steps)
     estimator.train(input_fn=train_input_fn, max_steps=num_train_steps)
 
 def evaluate(estimator, eval_input_fn):
@@ -782,6 +765,18 @@ def predict(processor, tokenizer, estimator):
             num_written_lines += 1
     assert num_written_lines == num_actual_predict_examples
 
+def train_and_eval(estimator, train_input_fn, eval_input_fn, num_train_steps, train_examples):
+    train_log(train_examples, num_train_steps)
+    tf.estimator.train_and_evaluate(
+        estimator,
+        tf.estimator.TrainSpec(input_fn=train_input_fn, max_steps=num_train_steps),
+        tf.estimator.EvalSpec(
+            input_fn=eval_input_fn,
+            start_delay_secs=10,
+            throttle_secs=10,
+        ),
+    )
+
 def main(_):
     tf.logging.set_verbosity(tf.logging.INFO)
     tf.gfile.MakeDirs(FLAGS.output_dir)
@@ -796,6 +791,8 @@ def main(_):
         train(estimator, train_input_fn, num_train_steps, train_examples)
         evaluate(estimator, eval_input_fn)
         predict(processor, tokenizer, estimator)
+    elif FLAGS.task == "te":
+        train_and_eval(estimator, train_input_fn, eval_input_fn, num_train_steps, train_examples)
     elif FLAGS.task == "eval":
         evaluate(estimator, eval_input_fn)
     elif FLAGS.task == "predict":
