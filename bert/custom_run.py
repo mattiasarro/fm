@@ -576,22 +576,22 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                 pred = tf.one_hot(predictions, len(h.STANCES), axis=-1)
                 f1 = lambda c: 2 * p[c][0] * r[c][0] / (p[c][0] + r[c][0])
 
-                tp = {
-                    c: tf.metrics.true_positives(lab[:, i], pred[:, i])
-                    for i, c in enumerate(h.STANCES)
-                }
-                tn = {
-                    c: tf.metrics.true_negatives(lab[:, i], pred[:, i])
-                    for i, c in enumerate(h.STANCES)
-                }
-                fp = {
-                    c: tf.metrics.false_positives(lab[:, i], pred[:, i])
-                    for i, c in enumerate(h.STANCES)
-                }
-                fn = {
-                    c: tf.metrics.false_negatives(lab[:, i], pred[:, i])
-                    for i, c in enumerate(h.STANCES)
-                }
+                # tp = {
+                #     c: tf.metrics.true_positives(lab[:, i], pred[:, i])
+                #     for i, c in enumerate(h.STANCES)
+                # }
+                # tn = {
+                #     c: tf.metrics.true_negatives(lab[:, i], pred[:, i])
+                #     for i, c in enumerate(h.STANCES)
+                # }
+                # fp = {
+                #     c: tf.metrics.false_positives(lab[:, i], pred[:, i])
+                #     for i, c in enumerate(h.STANCES)
+                # }
+                # fn = {
+                #     c: tf.metrics.false_negatives(lab[:, i], pred[:, i])
+                #     for i, c in enumerate(h.STANCES)
+                # }
 
                 p = {
                     c: tf.metrics.precision(lab[:, i], pred[:, i])
@@ -611,10 +611,10 @@ def model_fn_builder(bert_config, num_labels, init_checkpoint, learning_rate,
                     ret[c + "_precision"] = p[c]
                     ret[c + "_recall"] = r[c]
                     ret[c + "_F1"] = f[c]
-                    ret[c + "__tp"] = tp[c]
-                    ret[c + "__tn"] = tn[c]
-                    ret[c + "__fp"] = fp[c]
-                    ret[c + "__fn"] = fn[c]
+                    # ret[c + "__tp"] = tp[c]
+                    # ret[c + "__tn"] = tn[c]
+                    # ret[c + "__fp"] = fp[c]
+                    # ret[c + "__fn"] = fn[c]
 
                 ret["macro_avg"] = ((f["FAVOR"][0] + f["AGAINST"][0]) / 2, tf.no_op())
                 ret["eval_accuracy"] = tf.metrics.accuracy(

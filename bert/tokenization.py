@@ -150,7 +150,9 @@ def convert_ids_to_tokens(inv_vocab, ids):
 
 
 def whitespace_tokenize(text):
-    return TweetTokenizer(strip_handles=True, reduce_len=True).tokenize(text)
+    for token in TweetTokenizer(strip_handles=True, reduce_len=True).tokenize(text):
+        if token.startswith("#"): continue
+        yield token
 
 def whitespace_tokenize_old(text):
     """Runs basic whitespace cleaning and splitting on a piece of text."""
