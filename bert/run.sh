@@ -3,7 +3,7 @@ export GLUE_DIR=data/glue_data
 export SEME_DIR=data/stance_detection
 
 $PYTHON bert/custom_run.py \
-    --task=eval \
+    --task=$1 \
     --data_dir=$SEME_DIR \
     --vocab_file=$BERT_BASE_DIR/vocab.txt \
     --bert_config_file=$BERT_BASE_DIR/bert_config.json \
