@@ -49,15 +49,13 @@ def print_metrics():
         if label == pred:
             num_tp[pred] += 1
 
-    p = {}
-    r = {}
-    f = {}
-
+    p, r, f = {}, {}, {}
     for c in STANCES:
         p[c] = num_tp[c] / num_guess[c] if num_guess[c] != 0 else 0
         r[c] = num_tp[c] / num_gold[c] if num_gold[c] != 0 else 0
         f[c] = (2 * p[c] * r[c] / (p[c] + r[c])) if p[c] + r[c] != 0 else 0
 
-        print("%s precision = %.4f  recall = %.4f  F = %.4f" % (c, p[c], r[c], f[c]))
+        print("%s precision = %.4f  recall = %.4f  F = %.4f  predicted = %i  labelled = %i" %
+              (c, p[c], r[c], f[c], num_guess[c], num_gold[c]))
 
     print("macro F = %.4f" % (f["FAVOR"] + f["AGAINST"] / 2))
