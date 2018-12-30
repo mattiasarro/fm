@@ -9,4 +9,4 @@ $PYTHON bert/custom_run.py \
     --bert_config_file=$BERT_BASE_DIR/bert_config.json \
     --init_checkpoint=$BERT_BASE_DIR/bert_model.ckpt \
     --max_seq_length=128 \
-    --num_train_epochs=10.0 \
+    --num_train_epochs=20.0 \
