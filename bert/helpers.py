@@ -12,6 +12,14 @@ TARGETS = [
     "Atheism",
     "Climate Change is a Real Concern",
 ]
+TOPICS = [
+    "hillary",
+    "feminism",
+    "abortion",
+    None,
+    "climate",
+]
+TOPIC_TO_TARGET = {to: ta for to, ta in zip(TOPICS, TARGETS)}
 
 def train_data():
     data, columns = read('SemEval2016-Task6-subtaskA-traindata-gold.csv', quotechar='"')

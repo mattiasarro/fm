@@ -25,6 +25,7 @@ import modeling
 import optimization
 import tokenization
 import tensorflow as tf
+import numpy as np
 import helpers as h
 from math import ceil
 
@@ -43,7 +44,7 @@ flags.DEFINE_string(
     "The config json file corresponding to the pre-trained BERT model. "
     "This specifies the model architecture.")
 
-flags.DEFINE_string("task_name", "seme", "Unused.")
+flags.DEFINE_string("task_name", "seme", "seme | articles")
 
 flags.DEFINE_string("task", None, "tep | tune.")
 
@@ -149,7 +150,6 @@ class InputExample(object):
         self.text_b = text_b
         self.label = label
 
-
 class PaddingInputExample(object):
     """Fake example so the num input examples is a multiple of the batch size.
 
@@ -161,7 +161,6 @@ class PaddingInputExample(object):
     We use this class instead of `None` because treating `None` as padding
     battches could cause silent errors.
     """
-
 
 class InputFeatures(object):
     """A single set of features of data."""
@@ -177,7 +176,6 @@ class InputFeatures(object):
         self.segment_ids = segment_ids
         self.label_id = label_id
         self.is_real_example = is_real_example
-
 
 class DataProcessor(object):
     """Base class for data converters for sequence classification data sets."""
@@ -208,18 +206,17 @@ class DataProcessor(object):
                 lines.append(line)
             return lines
 
+    def _read_data(self, fn, encoding="iso-8859-1", **reader_kwargs):
+        with open(fn, 'r', encoding=encoding) as fin:
+            reader = csv.reader(fin, **reader_kwargs)
+            cols = next(reader)
+            return [
+                {col: val for col, val in zip(cols, line)}
+                for line in reader
+            ]
 
 class SemeProcessor(DataProcessor):
     """Processor for the SemEval 2016 Task 6 data set."""
-
-    TARGETS = [
-        "Hillary Clinton",
-        "Feminist Movement",
-        "Legalization of Abortion",
-        "Atheism",
-        "Climate Change is a Real Concern",
-    ]
-    STANCES = ["AGAINST", "NONE", "FAVOR"]
 
     def get_train_examples(self, data_dir):
         fn = os.path.join(data_dir, 'SemEval2016-Task6-subtaskA-traindata-gold.csv')
@@ -248,16 +245,38 @@ class SemeProcessor(DataProcessor):
         )
 
     def get_labels(self):
-        return SemeProcessor.STANCES
+        return h.STANCES
 
-    def _read_data(self, fn, **reader_kwargs):
-        with open(fn, 'r',  encoding="iso-8859-1") as fin:
-            reader = csv.reader(fin, **reader_kwargs)
-            cols = next(reader)
-            return [
-                {col: val for col, val in zip(cols, line)}
-                for line in reader
-            ]
+class ArticlesProcessor(DataProcessor):
+    """Processor for stance.csv"""
+
+    def get_train_examples(self, data_dir):
+        return []
+
+    def get_dev_examples(self, data_dir):
+        return self.get_examples(data_dir, "stance_test_random.csv")
+
+    def get_test_examples(self, data_dir):
+        return self.get_examples(data_dir, "stance_predict.csv")
+
+    def get_examples(self, data_dir, fn):
+        fn = os.path.join(data_dir, fn)
+        return [
+            self.example(i, l)
+            for i, l in enumerate(self._read_data(fn, encoding="utf-8"))
+        ]
+
+    def example(self, i, l):
+        u = lambda s: tokenization.convert_to_unicode(s)
+        return InputExample(
+            guid=i,
+            text_a=u(l["title"]),
+            text_b=u(h.TOPIC_TO_TARGET[l["controversial trending issue"]]),
+            label=u(l["stance"]),
+        )
+
+    def get_labels(self):
+        return h.STANCES
 
 
 def convert_single_example(ex_index, example, label_list, max_seq_length,
@@ -727,13 +746,6 @@ def evaluate(estimator, eval_input_fn):
 def predict(processor, tokenizer, estimator):
     predict_examples = processor.get_test_examples(FLAGS.data_dir)
     num_actual_predict_examples = len(predict_examples)
-    if FLAGS.use_tpu:
-        # TPU requires a fixed batch size for all batches, therefore the number
-        # of examples must be a multiple of the batch size, or else examples
-        # will get dropped. So we pad with fake examples which are ignored
-        # later on.
-        while len(predict_examples) % FLAGS.predict_batch_size != 0:
-            predict_examples.append(PaddingInputExample())
 
     predict_file = os.path.join(FLAGS.output_dir, "predict.tf_record")
     file_based_convert_examples_to_features(
@@ -754,6 +766,7 @@ def predict(processor, tokenizer, estimator):
         drop_remainder=predict_drop_remainder)
 
     result = estimator.predict(input_fn=predict_input_fn)
+    classes = processor.get_labels()
 
     output_predict_file = os.path.join(
         FLAGS.output_dir, "test_results.tsv")
@@ -761,19 +774,20 @@ def predict(processor, tokenizer, estimator):
         num_written_lines = 0
         tf.logging.info("***** Predict results *****")
         for (i, prediction) in enumerate(result):
-            probabilities = prediction["probabilities"]
+            # probabilities = prediction["probabilities"]
             if i >= num_actual_predict_examples:
                 break
-            output_line = "\t".join(
-                str(class_probability)
-                for class_probability in probabilities) + "\n"
-            writer.write(output_line)
+            # output_line = "\t".join(
+            #     str(class_probability)
+            #     for class_probability in probabilities) + "\n"
+            cls_i = np.argmax(prediction["probabilities"])
+            writer.write(classes[cls_i] + "\n")
             num_written_lines += 1
     assert num_written_lines == num_actual_predict_examples
 
 def train_and_eval(estimator, train_input_fn, eval_input_fn, num_train_steps, train_examples):
     train_log(train_examples, num_train_steps)
-    tf.estimator.train_and_evaluate(
+    return tf.estimator.train_and_evaluate(
         estimator,
         tf.estimator.TrainSpec(input_fn=train_input_fn, max_steps=num_train_steps),
         tf.estimator.EvalSpec(
@@ -798,7 +812,8 @@ def main(_):
     tf.logging.set_verbosity(tf.logging.INFO)
     tf.gfile.MakeDirs(FLAGS.output_dir)
 
-    processor = SemeProcessor()
+    processors = {"seme": SemeProcessor, "articles": ArticlesProcessor}
+    processor = processors[FLAGS.task_name]()
     tokenizer = tokenization.FullTokenizer(vocab_file=FLAGS.vocab_file, do_lower_case=True)
     estimator, train_examples, num_train_steps = get_estimator(processor)
     train_input_fn = get_train_input_fn(processor, tokenizer, train_examples)
@@ -814,7 +829,7 @@ def main(_):
         predict(processor, tokenizer, estimator)
     elif FLAGS.task == "te":
         train_and_eval(train_input_fn, eval_input_fn, num_train_steps, train_examples)
-    if FLAGS.task == "tune":
+    elif FLAGS.task == "tune":
         tune(processor, train_input_fn, eval_input_fn)
     else:
         raise Exception("Unknown task " + str(FLAGS.task))

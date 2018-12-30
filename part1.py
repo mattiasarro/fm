@@ -1,7 +1,7 @@
 import pandas as pd
-import helpers as h
+import bert.helpers as h
 
-pd.options.display.max_colwidth = 250
+pd.options.display.max_colwidth = 25000
 
 tr = h.train_data()
 te = h.test_data()
@@ -38,5 +38,12 @@ te.head()
 te.Target.value_counts()
 
 st["controversial trending issue"].value_counts()
+st["stance"] = "NONE"
+st.sample(50).to_csv(h.dataset_path + "stance_predict.csv")
 
-st.columns
+# test_set = pd.concat([
+#     st[st["controversial trending issue"] == topic].sample(10)
+#     for topic in h.TOPICS
+#     if topic is not None
+# ])
+# test_set.to_csv(h.dataset_path + "stance_test_random.csv")
