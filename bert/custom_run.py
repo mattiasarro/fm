@@ -828,7 +828,7 @@ def main(_):
     elif FLAGS.task == "predict":
         predict(processor, tokenizer, estimator)
     elif FLAGS.task == "te":
-        train_and_eval(train_input_fn, eval_input_fn, num_train_steps, train_examples)
+        train_and_eval(estimator, train_input_fn, eval_input_fn, num_train_steps, train_examples)
     elif FLAGS.task == "tune":
         tune(processor, train_input_fn, eval_input_fn)
     else:
