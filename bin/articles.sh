@@ -3,15 +3,14 @@ export GLUE_DIR=data/glue_data
 export SEME_DIR=data/stance_detection
 
 export TASK=$1
-export HPARAMS_ID=$2
-export STEP=$3
+export CHECKPOINT=$2
 
-$PYTHON bert/custom_run.py \
+python bert/custom_run.py \
     --task_name=articles \
     --task=$TASK \
     --data_dir=$SEME_DIR \
     --vocab_file=$BERT_BASE_DIR/vocab.txt \
     --bert_config_file=$BERT_BASE_DIR/bert_config.json \
-    --init_checkpoint=/tmp/tune/$HPARAMS_ID/model.ckpt-$STEP \
+    --init_checkpoint=$CHECKPOINT \
     --max_seq_length=128 \
     --output_dir=article_preds/
