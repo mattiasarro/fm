@@ -36,14 +36,3 @@ tr.shape
 
 te.head()
 te.Target.value_counts()
-
-st["controversial trending issue"].value_counts()
-st["stance"] = "NONE"
-st.sample(50).to_csv(h.dataset_path + "stance_predict.csv")
-
-# test_set = pd.concat([
-#     st[st["controversial trending issue"] == topic].sample(10)
-#     for topic in h.TOPICS
-#     if topic is not None
-# ])
-# test_set.to_csv(h.dataset_path + "stance_test_random.csv")
